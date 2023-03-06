@@ -1,54 +1,30 @@
-import { ChatGPTAPI, ChatGPTUnofficialProxyAPI } from "chatgpt";
-import express, { Request, Response } from "express";
-import inquirer from "inquirer";
 import * as dotenv from "dotenv";
-import Keyv from "keyv";
-import { oraPromise } from "ora";
-import { createChatSession } from "./chatapi/ChatSession";
+import { fetchTranscript } from "./transcript/fetchTranscript";
+import { parseTranscript } from "./transcript/parseTranscript";
+import readline from "readline/promises";
 
 //https://chat.openai.com/api/auth/session
 dotenv.config();
 
-interface PromptMessage {
-  content: string;
-}
-
 const CHAT_MODE = true;
+const URL = "https://youtu.be/BagY2Mnz-TU";
 
 async function main() {
-  const chatSession = await createChatSession({
-    apiKey: process.env.OPENAI_API_KEY as string,
-  });
+  const rl = readline.createInterface(process.stdin, process.stdout);
+  const url = await rl.question("Please Enter the Video URL:");
 
-  const app = express();
-  const port = 1234;
+  //@ts-ignore
+  const transcript = await fetchTranscript(url);
+  // console.log(transcript);
 
-  app.use(express.json());
-  app.post("/prompt", async (req: Request, res: Response) => {
-    const message = req.body as PromptMessage;
-    console.log("message received");
-    console.log(message);
-    const chatGPTResponse = await oraPromise(chatSession.send(message.content));
-    console.log("\n" + chatGPTResponse + "\n");
-    res.json({ content: chatGPTResponse });
-  });
+  const parsedTranscript = parseTranscript(transcript);
 
-  app.post("/reset", () => {
-    chatSession.clearMessages();
-  });
-
-  app.listen(port, () => {
-    console.log(`🚀 server started at http://localhost:${port}`);
-  });
-
-  // server side interface
-  // while (true) {
-  //   const { prompt } = await inquirer.prompt([
-  //     { type: "input", name: "prompt", message: "ask gpt:" },
-  //   ]);
-  //   const chatResponse = await oraPromise(chatSession.send(prompt));
-  //   console.log("\n" + chatResponse + "\n");
-  // }
+  const withTimestamp = await rl.question("Print with timestamp? (y/n)");
+  if (withTimestamp === "y") {
+    console.log(parsedTranscript.getPrintableFormat(true));
+  } else {
+    console.log(parsedTranscript.getPrintableFormat(false));
+  }
 }
 
 main();
